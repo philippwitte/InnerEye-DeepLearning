@@ -25,6 +25,7 @@ from InnerEye.Azure.run_pytest import download_pytest_result, run_pytest
 from InnerEye.Common import fixed_paths
 from InnerEye.Common.common_util import CROSSVAL_RESULTS_FOLDER, FULL_METRICS_DATAFRAME_FILE, METRICS_AGGREGATES_FILE, \
     disable_logging_to_file, is_linux, logging_to_file, logging_to_stdout, print_exception
+from InnerEye.Common.fixed_paths import DEFAULT_AML_UPLOAD_DIR
 from InnerEye.ML.common import DATASET_CSV_FILE_NAME
 from InnerEye.ML.config import SegmentationModelBase
 from InnerEye.ML.model_config_base import ModelConfigBase
@@ -268,8 +269,13 @@ def run(project_root: Path,
                     print_exception(ex, "Unable to run PyTest.")
                     pytest_failed = True
         finally:
-            # Try/finally block to ensure that all run outputs, including test result file, are uploaded to Azure
-            azure_config.upload_outputs_to_run(outputs_folder, run=RUN_CONTEXT)
+            # Try/finally block to ensure that all run outputs, including test result file, are uploaded to Azure.
+            # We only need to do that if the equality does not hold, otherwise it will be done automatically.
+            if Path(outputs_folder) == project_root / DEFAULT_AML_UPLOAD_DIR:
+                logging.info(f"Not uploading {outputs_folder} to AzureML, as it should be done automatically.")
+            else:
+                logging.info(f"Uploading {outputs_folder} to AzureML")
+                RUN_CONTEXT.upload_folder(name=DEFAULT_AML_UPLOAD_DIR, path=outputs_folder)
             # wait for aggregation if required, and only if the training actually succeeded.
             if not training_failed and model_config.should_wait_for_other_cross_val_child_runs:
                 wait_for_cross_val_runs_to_finish_and_aggregate(model_config,

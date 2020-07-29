@@ -36,9 +36,6 @@ class VMPriority(Enum):
     Dedicated = 'dedicated'
 
 
-DEFAULT_AML_UPLOAD_DIR = "outputs"
-DEFAULT_AML_LOGS_DIR = "azureml-logs"
-
 # The name of the submit_to_azureml property of AzureConfig
 AZURECONFIG_SUBMIT_TO_AZUREML = "submit_to_azureml"
 
@@ -225,7 +222,7 @@ class AzureConfig(GenericConfig):
                 account=self.storage_account,
                 account_key=key,
                 blobs_destination_path=to_azure_friendly_container_path(
-                    Path(get_results_blob_path(get_run_id(run))) / DEFAULT_AML_UPLOAD_DIR
+                    Path(get_results_blob_path(get_run_id(run))) / fixed_paths.DEFAULT_AML_UPLOAD_DIR
                 ),
                 source=Path(source)
             )
@@ -252,7 +249,7 @@ class AzureConfig(GenericConfig):
             account=self.storage_account,
             account_key=key,
             blobs_root_path=to_azure_friendly_container_path(
-                Path(get_results_blob_path(get_run_id(run))) / DEFAULT_AML_UPLOAD_DIR / blobs_path
+                Path(get_results_blob_path(get_run_id(run))) / fixed_paths.DEFAULT_AML_UPLOAD_DIR / blobs_path
             ),
             destination=destination,
             is_file=is_file
