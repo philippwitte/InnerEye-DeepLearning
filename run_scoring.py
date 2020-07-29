@@ -88,7 +88,11 @@ def write_script(parser: argparse.ArgumentParser, script_path: Path, project_roo
             run(f"conda-merge {submodule_env} {top_level_env} > {merged_env}")
         else:
             merged_env = submodule_env
-        run(f"conda env update --name $CONDA_DEFAULT_ENV --file {merged_env}")
+        if os.environ.get('CONDA_DEFAULT_ENV', None):
+            run(f"conda env update --name $CONDA_DEFAULT_ENV --file {merged_env}")
+        else:
+            run(f"conda env create --name InnerEye --file {merged_env}")
+            run(f"source activate InnerEye")
         # unknown_args should start with the script, so we prepend that with project_root if necessary.
         if not Path(unknown_args[0]).exists():
             unknown_args[0] = os.path.join(INNEREYE_SUBMODULE_NAME, unknown_args[0])
@@ -121,5 +125,5 @@ def run(project_root: Path) -> None:
     parser.add_argument('--data-folder', dest='data_folder', action='store', type=str)
     script_path = Path('run_score.sh')
     write_script(parser, script_path, project_root)
-    code = spawn_and_monitor_subprocess(process='sh', args=[str(script_path)], env=dict(os.environ.items()))
+    code = spawn_and_monitor_subprocess(process='bash', args=[str(script_path)], env=dict(os.environ.items()))
     sys.exit(code)
