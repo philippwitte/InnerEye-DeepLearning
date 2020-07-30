@@ -59,14 +59,13 @@ def init_from_model_inference_json(model_path: Path, use_gpu: bool = True) -> Tu
     Loads the config and inference pipeline from the current directory using fixed_paths.MODEL_INFERENCE_JSON_FILE_NAME
     :return: Tuple[InferencePipeline, Config]
     """
-    import logging
-    logging.info('Python version: ' + sys.version)
+    print('Python version: ' + sys.version)
     path_to_model_inference_config = model_path / fixed_paths.MODEL_INFERENCE_JSON_FILE_NAME
-    logging.info(f'path_to_model_inference_config: {path_to_model_inference_config}')
+    print(f'path_to_model_inference_config: {path_to_model_inference_config}')
     model_inference_config = read_model_inference_config(str(path_to_model_inference_config))
-    logging.info(f'model_inference_config: {model_inference_config}')
+    print(f'model_inference_config: {model_inference_config}')
     full_path_to_checkpoints = [model_path / x for x in model_inference_config.checkpoint_paths]
-    logging.info(f'full_path_to_checkpoints: {full_path_to_checkpoints}')
+    print(f'full_path_to_checkpoints: {full_path_to_checkpoints}')
     loader = ModelConfigLoader[SegmentationModelBase](
         model_configs_namespace=model_inference_config.model_configs_namespace)
     model_config = loader.create_model_config_from_name(model_name=model_inference_config.model_name)
