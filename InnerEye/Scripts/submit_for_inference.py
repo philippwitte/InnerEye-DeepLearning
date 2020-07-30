@@ -70,7 +70,7 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
     model_id = model.id
     source_directory = Path(tempfile.TemporaryDirectory().name)
     copy_image_file(args.image_file, source_directory / DEFAULT_DATA_FOLDER)
-    for base in [RUN_MODEL, "run_scoring.py"]:
+    for base in [RUN_MODEL, "run_scoring.py", "score.py"]:
         shutil.copyfile(base, str(source_directory / base))
     environment_variables = {
         "AZUREML_OUTPUT_UPLOAD_TIMEOUT_SEC": "36000"
