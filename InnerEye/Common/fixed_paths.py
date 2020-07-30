@@ -30,9 +30,6 @@ ENVIRONMENT_YAML_FILE_NAME = "environment.yml"
 DEFAULT_AML_UPLOAD_DIR = "outputs"
 DEFAULT_AML_LOGS_DIR = "azureml-logs"
 
-# If RUN_OUTPUTS_DIR_NAME is the same as DEFAULT_AML_UPLOAD_DIR, data written to that folder under the project
-# root should be automatically uploaded to blob storage and AzureML behind the scenes.
-RUN_OUTPUTS_DIR_NAME = DEFAULT_AML_UPLOAD_DIR
 DEFAULT_LOGS_DIR_NAME = "logs"
 DATASETS_DIR_NAME = "datasets"
 DATASETS_ACCOUNT_NAME = "innereyepublicdatasets"

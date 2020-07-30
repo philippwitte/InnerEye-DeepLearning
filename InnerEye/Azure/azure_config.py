@@ -19,13 +19,11 @@ from azureml.train.estimator import Estimator
 from azureml.train.hyperdrive import HyperDriveConfig
 
 from InnerEye.Azure.azure_util import get_results_blob_path, get_run_id, \
-    is_offline_run_context, \
-    to_azure_friendly_container_path
+    is_offline_run_context, to_azure_friendly_container_path
 from InnerEye.Azure.secrets_handling import APPLICATION_KEY, SecretsHandling, read_variables_from_yaml
 from InnerEye.Common import fixed_paths
 from InnerEye.Common.generic_parsing import GenericConfig
-from InnerEye.Common.type_annotations import PathOrString
-from InnerEye.ML.utils.blobxfer_util import download_blobs, upload_blobs
+from InnerEye.ML.utils.blobxfer_util import download_blobs
 
 
 class VMPriority(Enum):
@@ -204,28 +202,6 @@ class AzureConfig(GenericConfig):
             tenant_id=self.tenant_id,
             service_principal_id=self.application_id,
             service_principal_password=application_key)
-
-    def upload_outputs_to_run(self, source: PathOrString, run: Run) -> None:
-        """
-        Upload the blobs from the provided path to the run's storage container / DEFAULT_AML_UPLOAD_DIR.
-        Silently returns for runs outside AzureML.
-        :param source: Path to upload
-        :param run: Uploads to the storage container for this run.
-        """
-        if not is_offline_run_context(run):
-            if self.storage_account is None:
-                raise ValueError("self.storage_account is None")
-            key = self.get_storage_account_key()
-            if key is None:
-                raise ValueError("self.storage_account_key is None")
-            upload_blobs(
-                account=self.storage_account,
-                account_key=key,
-                blobs_destination_path=to_azure_friendly_container_path(
-                    Path(get_results_blob_path(get_run_id(run))) / fixed_paths.DEFAULT_AML_UPLOAD_DIR
-                ),
-                source=Path(source)
-            )
 
     def download_outputs_from_run(self, blobs_path: Path,
                                   destination: Path,
