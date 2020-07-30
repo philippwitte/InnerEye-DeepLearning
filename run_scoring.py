@@ -106,10 +106,10 @@ def write_script(parser: argparse.ArgumentParser, script_path: Path, project_roo
         echo(f"Command is: {spawn_command}")
         run(spawn_command)
         # Reinstate these for debugging if required
-        # echo(f"Contents of {spawn_out}:")
-        # run(f"cat {spawn_out}")
-        # echo(f"Contents of {spawn_err}:")
-        # run(f"cat {spawn_err}")
+        echo(f"Contents of {spawn_out}:")
+        run(f"cat {spawn_out}")
+        echo(f"Contents of {spawn_err}:")
+        run(f"cat {spawn_err}")
         echo("Finished")
     with script_path.open(mode='r') as inp:
         print(f"Contents of {script_path}:\n")
