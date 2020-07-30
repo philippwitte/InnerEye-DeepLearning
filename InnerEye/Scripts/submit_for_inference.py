@@ -11,7 +11,8 @@ from pathlib import Path
 import param
 from typing import Optional
 
-from azureml.core import Experiment, Model, Run
+from azureml.core import Environment, Experiment, Model, Run
+from azureml.core.environment import DEFAULT_GPU_IMAGE
 from azureml.core.workspace import WORKSPACE_DEFAULT_BLOB_STORE_NAME
 from azureml.train.estimator import Estimator
 
@@ -32,11 +33,13 @@ class SubmitForInferenceConfig(GenericConfig):
     model_version: Optional[int] = param.Number(default=None, doc="Version of model, e.g. 123")
     model_id: Optional[str] = param.String(default=None, doc="Id of model, e.g. Prostate:123")
     image_file: Path = param.ClassSelector(class_=Path, doc="Image file to segment, ending in .nii.gz")
-    yaml_file_path: Path = param.ClassSelector(
+    yaml_file: Path = param.ClassSelector(
         class_=Path, doc="File containing subscription details, typically your train_variables.yml")
+    environment_file: Path = param.ClassSelector(
+        class_=Path, doc="Environment YAML file")
 
     def validate(self) -> None:
-        assert self.yaml_file_path is not None
+        assert self.yaml_file is not None
         if self.model_id is None:
             # We need at least a model name to identify a model
             assert self.model_name is not None
@@ -53,15 +56,15 @@ class SubmitForInferenceConfig(GenericConfig):
             raise ValueError(f"Bad image file name, does not end with .nii.gz: {self.image_file.name}")
 
 
-def copy_image_file(image_path: Path, image_directory: Path) -> None:
+def copy_image_file(image: Path, image_directory: Path) -> None:
     image_directory.mkdir(parents=True, exist_ok=True)
-    dst_path = image_directory / DEFAULT_TEST_IMAGE_NAME
-    logging.info(f"Copying {image_path} to {dst_path}")
-    shutil.copyfile(str(image_path), str(dst_path))
+    dst = image_directory / DEFAULT_TEST_IMAGE_NAME
+    logging.info(f"Copying {image} to {dst}")
+    shutil.copyfile(str(image), str(dst))
 
 
 def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
-    azure_config = AzureConfig.from_yaml(args.yaml_file_path)
+    azure_config = AzureConfig.from_yaml(args.yaml_file)
     workspace = azure_config.get_workspace()
     model = Model(workspace=workspace, name=args.model_name, version=args.model_version, id=args.model_id)
     model_id = model.id
@@ -72,6 +75,13 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
     environment_variables = {
         "AZUREML_OUTPUT_UPLOAD_TIMEOUT_SEC": "36000"
     }
+    azureml_environment = Environment.from_conda_specification(
+        name="Inference",
+        file_path=str(args.environment_file))
+    azureml_environment.environment_variables = environment_variables
+    azureml_environment.docker.shm_size = azure_config.docker_shm_size
+    azureml_environment.docker.enabled = True
+    azureml_environment.docker._base_image = DEFAULT_GPU_IMAGE
     estimator = Estimator(
         source_directory=str(source_directory),
         entry_script=RUN_MODEL,
@@ -81,10 +91,11 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
         # Use blob storage for storing the source, rather than the FileShares section of the storage account.
         source_directory_data_store=workspace.datastores.get(WORKSPACE_DEFAULT_BLOB_STORE_NAME),
         inputs=[],
-        environment_variables=environment_variables,
-        shm_size=azure_config.docker_shm_size,
+        # environment_variables=environment_variables,
+        # shm_size=azure_config.docker_shm_size,
         use_docker=True,
-        use_gpu=True,
+        # use_gpu=True,
+        environment_definition=azureml_environment
     )
     exp = Experiment(workspace=workspace, name="dacart_inference")
     run = exp.submit(estimator)
