@@ -105,6 +105,7 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
 def main() -> None:
     run = submit_for_inference(SubmitForInferenceConfig.parse_args())
     print(f"Submitted run {run.id} in experiment {run.experiment.name}")
+    print(f"Run URL: {run.get_portal_url()}")
 
 
 if __name__ == '__main__':
