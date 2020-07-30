@@ -110,6 +110,8 @@ def write_script(parser: argparse.ArgumentParser, script_path: Path, project_roo
         run(f"cat {spawn_out}")
         echo(f"Contents of {spawn_err}:")
         run(f"cat {spawn_err}")
+        echo(f"Contents of {project_root}:")
+        run(f"ls -oR {project_root}")
         echo("Finished")
     with script_path.open(mode='r') as inp:
         print(f"Contents of {script_path}:\n")
