@@ -91,6 +91,8 @@ def write_script(parser: argparse.ArgumentParser, script_path: Path, project_roo
         if os.environ.get('CONDA_DEFAULT_ENV', None):
             run(f"conda env update --name $CONDA_DEFAULT_ENV --file {merged_env}")
         else:
+            echo("conda info --envs gives:")
+            run("conda info --envs")
             run(f"conda env create --name InnerEye --file {merged_env}")
             run(f"source activate InnerEye")
         # unknown_args should start with the script, so we prepend that with project_root if necessary.
