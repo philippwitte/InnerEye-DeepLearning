@@ -34,8 +34,6 @@ class SubmitForInferenceConfig(GenericConfig):
     image_file: Path = param.ClassSelector(class_=Path, doc="Image file to segment, ending in .nii.gz")
     yaml_file: Path = param.ClassSelector(
         class_=Path, doc="File containing subscription details, typically your train_variables.yml")
-    environment_file: Path = param.ClassSelector(
-        class_=Path, doc="Environment YAML file")
 
     def validate(self) -> None:
         assert self.yaml_file is not None
@@ -67,10 +65,10 @@ def download_conda_dependency_files(model: Model, dir_path: Path) -> List[Path]:
     downloaded: List[Path] = []
     for path, url in url_dict.items():
         if Path(path).name == "environment.yml":
-            tgt_path = dir_path / f"tmp_environment_{len(downloaded) + 1:03d}"
+            tgt_path = dir_path / f"tmp_environment_{len(downloaded) + 1:03d}.yml"
             with tgt_path.open('wb') as out:
                 out.write(requests.get(url, allow_redirects=True).content)
-            logging.info(f"Downloaded {tgt_path} from {url}")
+            print(f"Downloaded {tgt_path} from {url}")
             downloaded.append(tgt_path)
     return downloaded
 
@@ -88,7 +86,7 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
 
     source_config = SourceConfig(
         root_folder=source_directory_name,
-        entry_script=RUN_MODEL,
+        entry_script=str(source_directory_path / RUN_MODEL),
         script_params={"--data-folder": DEFAULT_DATA_FOLDER, "--spawnprocess": "python",
                        "--model-id": model_id, "score.py": ""},
         conda_dependencies_files=download_conda_dependency_files(model, source_directory_path)
@@ -100,6 +98,7 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
 
 
 def main() -> None:
+    logging.getLogger().setLevel(logging.INFO)
     run = submit_for_inference(SubmitForInferenceConfig.parse_args())
     print(f"Submitted run {run.id} in experiment {run.experiment.name}")
     print(f"Run URL: {run.get_portal_url()}")
