@@ -80,17 +80,18 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
     workspace = azure_config.get_workspace()
     model = Model(workspace=workspace, name=args.model_name, version=args.model_version, id=args.model_id)
     model_id = model.id
-    source_directory = Path(tempfile.TemporaryDirectory().name)
-    copy_image_file(args.image_file, source_directory / DEFAULT_DATA_FOLDER)
+    source_directory_name = tempfile.TemporaryDirectory().name
+    source_directory_path = Path(source_directory_name)
+    copy_image_file(args.image_file, source_directory_path / DEFAULT_DATA_FOLDER)
     for base in [RUN_MODEL, "run_scoring.py", "score.py"]:
-        shutil.copyfile(base, str(source_directory / base))
+        shutil.copyfile(base, str(source_directory_path / base))
 
     source_config = SourceConfig(
-        root_folder=source_directory,
+        root_folder=source_directory_name,
         entry_script=RUN_MODEL,
         script_params={"--data-folder": DEFAULT_DATA_FOLDER, "--spawnprocess": "python",
                        "--model-id": model_id, "score.py": ""},
-        conda_dependencies_files=download_conda_dependency_files(model, source_directory)
+        conda_dependencies_files=download_conda_dependency_files(model, source_directory_path)
     )
     estimator = create_estimator_from_configs(workspace, azure_config, source_config, [])
     exp = Experiment(workspace=workspace, name=args.experiment_name)
