@@ -313,6 +313,7 @@ def reorder_for_merging(files: List[Path]) -> List[Path]:
             unique_files.append(file)
     if len(unique_files) == 1:
         return unique_files
+    # Detect files that could trigger the bug
     indices = []
     for i, file in enumerate(unique_files):
         with file.open() as fp:
