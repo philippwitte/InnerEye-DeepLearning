@@ -6,17 +6,16 @@
 import logging
 import shutil
 import tempfile
+import requests
 from pathlib import Path
 
 import param
-from typing import Optional
+from typing import List, Optional
 
-from azureml.core import Environment, Experiment, Model, Run
-from azureml.core.environment import DEFAULT_GPU_IMAGE
-from azureml.core.workspace import WORKSPACE_DEFAULT_BLOB_STORE_NAME
-from azureml.train.estimator import Estimator
+from azureml.core import Experiment, Model, Run
 
-from InnerEye.Azure.azure_config import AzureConfig
+from InnerEye.Azure.azure_config import AzureConfig, SourceConfig
+from InnerEye.Azure.azure_runner import create_estimator_from_configs
 from InnerEye.Common.generic_parsing import GenericConfig
 from score import DEFAULT_DATA_FOLDER, DEFAULT_TEST_IMAGE_NAME
 
@@ -63,6 +62,19 @@ def copy_image_file(image: Path, image_directory: Path) -> None:
     shutil.copyfile(str(image), str(dst))
 
 
+def download_conda_dependency_files(model: Model, dir_path: Path) -> List[Path]:
+    url_dict = model.get_sas_urls()
+    downloaded: List[Path] = []
+    for path, url in url_dict.items():
+        if Path(path).name == "environment.yml":
+            tgt_path = dir_path / f"tmp_environment_{len(downloaded) + 1:03d}"
+            with tgt_path.open('wb') as out:
+                out.write(requests.get(url, allow_redirects=True).content)
+            logging.info(f"Downloaded {tgt_path} from {url}")
+            downloaded.append(tgt_path)
+    return downloaded
+
+
 def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
     azure_config = AzureConfig.from_yaml(args.yaml_file)
     workspace = azure_config.get_workspace()
@@ -72,32 +84,16 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
     copy_image_file(args.image_file, source_directory / DEFAULT_DATA_FOLDER)
     for base in [RUN_MODEL, "run_scoring.py", "score.py"]:
         shutil.copyfile(base, str(source_directory / base))
-    environment_variables = {
-        "AZUREML_OUTPUT_UPLOAD_TIMEOUT_SEC": "36000"
-    }
-    azureml_environment = Environment.from_conda_specification(
-        name="Inference",
-        file_path=str(args.environment_file))
-    azureml_environment.environment_variables = environment_variables
-    azureml_environment.docker.shm_size = azure_config.docker_shm_size
-    azureml_environment.docker.enabled = True
-    azureml_environment.docker._base_image = DEFAULT_GPU_IMAGE
-    estimator = Estimator(
-        source_directory=str(source_directory),
+
+    source_config = SourceConfig(
+        root_folder=source_directory,
         entry_script=RUN_MODEL,
         script_params={"--data-folder": DEFAULT_DATA_FOLDER, "--spawnprocess": "python",
                        "--model-id": model_id, "score.py": ""},
-        compute_target=azure_config.gpu_cluster_name,
-        # Use blob storage for storing the source, rather than the FileShares section of the storage account.
-        source_directory_data_store=workspace.datastores.get(WORKSPACE_DEFAULT_BLOB_STORE_NAME),
-        inputs=[],
-        # environment_variables=environment_variables,
-        # shm_size=azure_config.docker_shm_size,
-        use_docker=True,
-        # use_gpu=True,
-        environment_definition=azureml_environment
+        conda_dependencies_files=download_conda_dependency_files(model, source_directory)
     )
-    exp = Experiment(workspace=workspace, name="dacart_inference")
+    estimator = create_estimator_from_configs(workspace, azure_config, source_config, [])
+    exp = Experiment(workspace=workspace, name=args.experiment_name)
     run = exp.submit(estimator)
     return run
 
