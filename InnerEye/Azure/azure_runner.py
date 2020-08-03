@@ -23,7 +23,7 @@ from InnerEye.Azure.azure_config import AzureConfig, ParserResult, SourceConfig
 from InnerEye.Azure.azure_util import CROSS_VALIDATION_SPLIT_INDEX_TAG_KEY, RUN_RECOVERY_ID_KEY_NAME, \
     merge_conda_dependencies
 from InnerEye.Azure.secrets_handling import read_variables_from_yaml
-from InnerEye.Common.fixed_paths import AZUREML_DATASTORE_NAME, get_environment_yaml_file
+from InnerEye.Common.fixed_paths import AZUREML_DATASTORE_NAME
 from InnerEye.Common.generic_parsing import GenericConfig
 from InnerEye.ML.common import ModelExecutionMode
 from InnerEye.ML.utils.config_util import ModelConfigLoader
