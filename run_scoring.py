@@ -70,31 +70,28 @@ def write_script(parser: argparse.ArgumentParser, script_path: Path, project_roo
         else:
             pythonpath = str(project_root)
         run(f"export {PYTHONPATH_ENVIRONMENT_VARIABLE_NAME}={pythonpath}")
-        # We need to explicitly uninstall apex and radio because when given an explicit git+https URL,
-        # pip does not check that the package is up to date, only that some version is already installed.
-        echo("Uninstalling apex and radio")
-        run(f"pip uninstall --yes apex radio")
-        # Update the current conda environment (so no need to activate it afterwards, despite the message
-        # given by conda). If we have an environment.yml file in both the top level and the submodule,
-        # merge them.
-        echo("Updating conda environment")
-        top_level_env = Path("environment.yml")
-        submodule_env = submodule_abs / "environment.yml"
-        if not submodule_env.exists():
-            merged_env = top_level_env
-        elif top_level_env.exists():
-            merged_env = Path("merged.yml")
-            run("pip install conda-merge")
-            run(f"conda-merge {submodule_env} {top_level_env} > {merged_env}")
-        else:
-            merged_env = submodule_env
         if os.environ.get('CONDA_DEFAULT_ENV', None):
+            # Environment may need updating (otherwise we assume it's been set at submission
+            # time and is already correct).
+            # We need to explicitly uninstall apex and radio because when given an explicit git+https URL,
+            # pip does not check that the package is up to date, only that some version is already installed.
+            echo("Uninstalling apex and radio")
+            run(f"pip uninstall --yes apex radio")
+            # Update the current conda environment (so no need to activate it afterwards, despite the message
+            # given by conda). If we have an environment.yml file in both the top level and the submodule,
+            # merge them.
+            echo("Updating conda environment")
+            top_level_env = Path("environment.yml")
+            submodule_env = submodule_abs / "environment.yml"
+            if not submodule_env.exists():
+                merged_env = top_level_env
+            elif top_level_env.exists():
+                merged_env = Path("merged.yml")
+                run("pip install conda-merge")
+                run(f"conda-merge {submodule_env} {top_level_env} > {merged_env}")
+            else:
+                merged_env = submodule_env
             run(f"conda env update --name $CONDA_DEFAULT_ENV --file {merged_env}")
-        else:
-            echo("conda info --envs gives:")
-            run("conda info --envs")
-            run(f"conda env create --name InnerEye --file {merged_env}")
-            run(f"source activate InnerEye")
         # unknown_args should start with the script, so we prepend that with project_root if necessary.
         if not Path(unknown_args[0]).exists():
             unknown_args[0] = os.path.join(INNEREYE_SUBMODULE_NAME, unknown_args[0])
@@ -108,13 +105,13 @@ def write_script(parser: argparse.ArgumentParser, script_path: Path, project_roo
         echo(f"Command is: {spawn_command}")
         run(spawn_command)
         # Reinstate these for debugging if required
-        echo(f"Contents of {spawn_out}:")
-        run(f"cat {spawn_out}")
-        echo(f"Contents of {spawn_err}:")
-        run(f"cat {spawn_err}")
-        echo(f"Contents of {project_root}:")
-        run(f"ls -oR {project_root}")
-        echo("Finished")
+        # echo(f"Contents of {spawn_out}:")
+        # run(f"cat {spawn_out}")
+        # echo(f"Contents of {spawn_err}:")
+        # run(f"cat {spawn_err}")
+        # echo(f"Contents of {project_root}:")
+        # run(f"ls -oR {project_root}")
+        # echo("Finished")
     with script_path.open(mode='r') as inp:
         print(f"Contents of {script_path}:\n")
         print(inp.read())

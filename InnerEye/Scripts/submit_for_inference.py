@@ -100,8 +100,8 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Run:
 def main() -> None:
     logging.getLogger().setLevel(logging.INFO)
     run = submit_for_inference(SubmitForInferenceConfig.parse_args())
-    print(f"Submitted run {run.id} in experiment {run.experiment.name}")
-    print(f"Run URL: {run.get_portal_url()}")
+    logging.info(f"Submitted run {run.id} in experiment {run.experiment.name}")
+    logging.info(f"Run URL: {run.get_portal_url()}")
 
 
 if __name__ == '__main__':
