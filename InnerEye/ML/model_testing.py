@@ -42,7 +42,6 @@ BOXPLOT_FILE = "metrics_boxplot.png"
 THUMBNAILS_FOLDER = "thumbnails"
 
 
-
 def model_test(config: ModelConfigBase,
                data_split: ModelExecutionMode,
                run_recovery: Optional[RunRecovery] = None
