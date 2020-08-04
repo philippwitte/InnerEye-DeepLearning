@@ -295,14 +295,17 @@ def _log_conda_dependencies_stats(conda: CondaDependencies, message_prefix: str)
     conda_packages_count = len(list(conda.conda_packages))
     pip_packages_count = len(list(conda.pip_packages))
     logging.info(f"{message_prefix}: {conda_packages_count} conda packages, {pip_packages_count} pip packages")
-    logging.info("  Conda packages:")
+    logging.debug("  Conda packages:")
     for p in conda.conda_packages:
-        logging.info(f"    {p}")
+        logging.debug(f"    {p}")
+    logging.debug("  Pip packages:")
+    for p in conda.pip_packages:
+        logging.debug(f"    {p}")
 
 
 def reorder_for_merging(files: List[Path]) -> List[Path]:
     """
-    Workaround for bug in conda_dependencies.py in version 1.9.0 of azureml-sdk: if any file has a
+    Workaround for bug in conda_dependencies.py in versions up to 1.11.0 of azureml-sdk: if any file has a
     line containing "- pythonX" where the X character is not "=", put it first, as it will trigger
     the bug if merged in. If there is more than one such file, we're out of luck.
     """

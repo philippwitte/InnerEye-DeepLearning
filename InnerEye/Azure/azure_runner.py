@@ -220,6 +220,14 @@ def create_pytorch_environment(workspace: Workspace,
 
 def create_estimator_from_configs(workspace: Workspace, azure_config: AzureConfig, source_config: SourceConfig,
                                   estimator_inputs: List[DatasetConsumptionConfig]) -> Estimator:
+    """
+    Create an return an Estimator from the provided configuration information.
+    :param workspace: workspace that should contain a datastore named "workspaceblobstore", for storing source
+    :param azure_config: Azure configuration, used to store various values for the job to be submitted
+    :param source_config: source configutation, for other needed values
+    :param estimator_inputs: value for the "inputs" field of the estimator.
+    :return:
+    """
     rel_entry_script = os.path.relpath(source_config.entry_script, source_config.root_folder)
     logging.info(f"Entry script {rel_entry_script}, from {source_config.entry_script} and {source_config.root_folder}")
     environment_variables = {
