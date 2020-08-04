@@ -93,8 +93,8 @@ python Inner/ML/runner.py --submit_to_azureml=True --model=Prostate --is_train=F
    --run_recovery_id=foo_bar:foo_bar_12345_abcd --start_epoch=120
 ```
 
-Alternatively, to run a model on a single image on your local disc, you can use the script
-`submit_for_inference.py`, with a command of this form:
+Alternatively, to submit an AzureML run to apply a model to a single image on your local disc, 
+you can use the script `submit_for_inference.py`, with a command of this form:
 ```shell script
 python InnerEye/Scripts/submit_for_inference.py --image_file ~/somewhere/ct.nii.gz --model_id Prostate:555 \
   --yaml_file ../somewhere_else/train_variables.yml --download_folder ~/my_existing_folder
