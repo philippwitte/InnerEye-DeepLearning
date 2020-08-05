@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from azureml.core import Model, Run
 
@@ -111,11 +111,31 @@ def write_script(parser: argparse.ArgumentParser, script_path: Path, project_roo
     return
 
 
-def run(project_root: Path) -> None:
+def run(project_root: Optional[Path] = None) -> None:
+    """
+    Runs scoring on an image. This can be invoked in one of two ways:
+    (1) when there is already a model in the project_root directory; this is the case when
+    we arrive here from python_wrapper.py
+    (2) when we need to download a model, which must be specified by the --model-id switch.
+    This is the case when this script is invoked by submit_for_inference.py.
+    :param project_root: the directory in which the model (including code) is located.
+    Must be None if and only if the --model-id switch is provided.
+    """
     parser = argparse.ArgumentParser(
         description='Execute code baked into a Docker Container from AzureML ScriptRunConfig')
     parser.add_argument('--spawnprocess', dest='spawnprocess', action='store', type=str)
     parser.add_argument('--data-folder', dest='data_folder', action='store', type=str)
+    parser.add_argument('--model-id', dest='model_id', action='store', type=str)
+    known_args, unknown_args = parser.parse_known_args()
+    if known_args.model_id:
+        if project_root:
+            raise ValueError("--model-id should not be provided when project_root is specified")
+        workspace = Run.get_context().experiment.workspace
+        model = Model(workspace=workspace, id=known_args.model_id)
+        current_dir = Path(".")
+        project_root = Path(model.download(str(current_dir))).absolute()
+    elif not project_root:
+        raise ValueError("--model-id must be provided when project_root is unspecified")
     script_path = Path('run_score.sh')
     write_script(parser, script_path, project_root)
     print(f"Running {script_path} ...")
@@ -123,18 +143,5 @@ def run(project_root: Path) -> None:
     sys.exit(code)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Downloads and runs a model on images in a directory")
-    parser.add_argument('--model-id', dest='model_id', action='store', type=str)
-    known_args, unknown_args = parser.parse_known_args()
-    workspace = Run.get_context().experiment.workspace
-    model = Model(workspace=workspace, id=known_args.model_id)
-    current_dir = Path(".")
-    project_root = Path(model.download(str(current_dir))).absolute()
-    # Remove --model-id and its value ready for the parser in run(...), which is also called in other contexts.
-    sys.argv = sys.argv[:1] + unknown_args
-    run(project_root=project_root)
-
-
 if __name__ == '__main__':
-    main()
+    run()
