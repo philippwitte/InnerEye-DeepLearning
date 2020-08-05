@@ -46,6 +46,7 @@ def write_script(parser: argparse.ArgumentParser, script_path: Path, project_roo
     as a subprocess.
     :param parser: argument parser
     :param script_path: path to write
+    :param project_root: main directory in which code may be found
     """
     args, unknown_args = parser.parse_known_args()
     if not unknown_args:
@@ -57,18 +58,17 @@ def write_script(parser: argparse.ArgumentParser, script_path: Path, project_roo
 
         def echo(line: str) -> None:
             out.write(f"echo {script_path}: {line}\n")
-        # Set the PYTHONPATH to the project root and the InnerEye-DeepLearning submodule within it.
+        # Set the PYTHONPATH to the project root and the InnerEye-DeepLearning submodule within it, and also
+        # to any subdirectory (assumed to be a model directory) that contains either the submodule or "InnerEye".
         # This ensures that the path is clean, there are no namespace clashes and that only the desired code is run.
         submodule_abs = project_root / INNEREYE_SUBMODULE_NAME
+        components = [project_root, submodule_abs]
         # These lines can be uncommented for diagnostics:
         # echo(f"Listing {project_root}")
         # run(f"ls -o {project_root}")
         # echo(f"Listing {submodule_abs}")
         # run(f"ls -o {submodule_abs}")
-        if submodule_abs.exists():
-            pythonpath = f"{project_root}:{submodule_abs}"
-        else:
-            pythonpath = str(project_root)
+        pythonpath = ":".join(str(c) for c in components if c.exists())
         run(f"export {PYTHONPATH_ENVIRONMENT_VARIABLE_NAME}={pythonpath}")
         if os.environ.get('CONDA_DEFAULT_ENV', None):
             # Environment may need updating (otherwise we assume it's been set at submission
@@ -95,25 +95,17 @@ def write_script(parser: argparse.ArgumentParser, script_path: Path, project_roo
         # unknown_args should start with the script, so we prepend that with project_root if necessary.
         scoring_script = unknown_args[0]
         if not Path(scoring_script).exists():
-            unknown_args[0] = scoring_script = os.path.join(INNEREYE_SUBMODULE_NAME, scoring_script)
+            unknown_args[0] = os.path.join(INNEREYE_SUBMODULE_NAME, scoring_script)
         # Now the environment should be suitable for actually running inference.
-        echo(f"Starting scoring script {scoring_script}")
-        spawn_out = project_root / "spawn.out"
-        spawn_err = project_root / "spawn.err"
         spawn_command = (f"{args.spawnprocess} {' '.join(unknown_args)} --data_root {args.data_folder} "
-                         f"--project_root {project_root} " 
-                         f"> {spawn_out} 2> {spawn_err}")
-        echo(f"Command is: {spawn_command}")
+                         f"--project_root {project_root} ")
         run(spawn_command)
-        echo(f"Standard output from {scoring_script}:")
-        run(f"cat {spawn_out}")
-        echo(f"Standard error from {scoring_script}:")
-        run(f"cat {spawn_err}")
         echo("Finished")
     with script_path.open(mode='r') as inp:
         print(f"Contents of {script_path}:\n")
+        print("=" * 80)
         print(inp.read())
-        print("")
+        print("=" * 80)
     return
 
 
@@ -124,5 +116,6 @@ def run(project_root: Path) -> None:
     parser.add_argument('--data-folder', dest='data_folder', action='store', type=str)
     script_path = Path('run_score.sh')
     write_script(parser, script_path, project_root)
+    print(f"Running {script_path} ...")
     code = spawn_and_monitor_subprocess(process='bash', args=[str(script_path)], env=dict(os.environ.items()))
     sys.exit(code)

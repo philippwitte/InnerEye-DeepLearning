@@ -145,7 +145,7 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Optional[Path]:
     source_config = SourceConfig(
         root_folder=source_directory_name,
         entry_script=str(source_directory_path / RUN_MODEL),
-        script_params={"--data-folder": DEFAULT_DATA_FOLDER, "--spawnprocess": "python",
+        script_params={"--data-folder": ".", "--spawnprocess": "python",
                        "--model-id": model_id, "score.py": ""},
         conda_dependencies_files=download_conda_dependency_files(model, source_directory_path)
     )

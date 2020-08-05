@@ -172,6 +172,10 @@ def score_image(args: ScorePipelineConfig) -> Path:
     return Path(result_dst)
 
 
-if __name__ == "__main__":
+def main():
     print(f"{PYTHONPATH_ENVIRONMENT_VARIABLE_NAME}: {os.environ.get(PYTHONPATH_ENVIRONMENT_VARIABLE_NAME)}")
     score_image(ScorePipelineConfig.parse_args())
+
+
+if __name__ == "__main__":
+    main()

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from azureml.core import Model, Run
 
+import run_scoring
 
 INNEREYE_SUBMODULE_NAME = "innereye-deeplearning"
 
@@ -18,23 +19,9 @@ def main() -> None:
     known_args, unknown_args = parser.parse_known_args()
     workspace = Run.get_context().experiment.workspace
     model = Model(workspace=workspace, id=known_args.model_id)
-    project_root = Path(__file__).parent.absolute()
-    model_path = Path(model.download(str(project_root)))
-    # Move everything in model_path to project_root, where possible
-    for src in sorted(model_path.glob("*")):
-        dst = project_root / src.relative_to(model_path)
-        if not dst.exists():
-            src.rename(dst)
-        elif dst != Path(__file__):
-            print(f"WARNING: not moving {src} to {dst} as it already exists")
-    runner = project_root / INNEREYE_SUBMODULE_NAME / "run_scoring.py"
-    if not runner.exists():
-        print(f"WARNING: not found: {runner}")
-    for path in [project_root, project_root / INNEREYE_SUBMODULE_NAME]:
-        name = str(path)
-        if path.exists() and name not in sys.path:
-            sys.path.append(name)
-    import run_scoring
+    current_dir = Path(".")
+    project_root = Path(model.download(str(current_dir))).absolute()
+    # Remove --model-id and its value
     sys.argv = sys.argv[:1] + unknown_args
     run_scoring.run(project_root=project_root)
 
