@@ -20,8 +20,6 @@ from InnerEye.Common.fixed_paths import DEFAULT_RESULT_IMAGE_NAME, ENVIRONMENT_Y
 from InnerEye.Common.generic_parsing import GenericConfig
 from score import DEFAULT_DATA_FOLDER, DEFAULT_TEST_IMAGE_NAME
 
-RUN_MODEL = "run_model.py"
-
 
 class SubmitForInferenceConfig(GenericConfig):
     """
@@ -138,13 +136,13 @@ def submit_for_inference(args: SubmitForInferenceConfig) -> Optional[Path]:
     logging.info(f"Building inference run submission in {source_directory_name}")
     source_directory_path = Path(source_directory_name)
     copy_image_file(args.image_file, source_directory_path / DEFAULT_DATA_FOLDER)
-    # We copy over run_scoring.py and score.py as well as run_model.py itself, as the model we're using
-    # may not have sufficiently recent versions of those files.
-    for base in [RUN_MODEL, "run_scoring.py", "score.py"]:
+    # We copy over run_scoring.py, and score.py as well in case the model we're using
+    # does not have sufficiently recent versions of those files.
+    for base in ["run_scoring.py", "score.py"]:
         shutil.copyfile(base, str(source_directory_path / base))
     source_config = SourceConfig(
         root_folder=source_directory_name,
-        entry_script=str(source_directory_path / RUN_MODEL),
+        entry_script=str(source_directory_path / "run_scoring.py"),
         script_params={"--data-folder": ".", "--spawnprocess": "python",
                        "--model-id": model_id, "score.py": ""},
         conda_dependencies_files=download_conda_dependency_files(model, source_directory_path)

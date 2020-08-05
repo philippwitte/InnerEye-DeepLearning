@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
+from azureml.core import Model, Run
+
 # Top level directory containing the InnerEye submodule; does not have to exist.
 INNEREYE_SUBMODULE_NAME = "innereye-deeplearning"
 
@@ -119,3 +121,20 @@ def run(project_root: Path) -> None:
     print(f"Running {script_path} ...")
     code = spawn_and_monitor_subprocess(process='bash', args=[str(script_path)], env=dict(os.environ.items()))
     sys.exit(code)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Downloads and runs a model on images in a directory")
+    parser.add_argument('--model-id', dest='model_id', action='store', type=str)
+    known_args, unknown_args = parser.parse_known_args()
+    workspace = Run.get_context().experiment.workspace
+    model = Model(workspace=workspace, id=known_args.model_id)
+    current_dir = Path(".")
+    project_root = Path(model.download(str(current_dir))).absolute()
+    # Remove --model-id and its value ready for the parser in run(...), which is also called in other contexts.
+    sys.argv = sys.argv[:1] + unknown_args
+    run(project_root=project_root)
+
+
+if __name__ == '__main__':
+    main()
