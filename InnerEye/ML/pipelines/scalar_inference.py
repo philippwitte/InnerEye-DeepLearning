@@ -107,7 +107,7 @@ class ScalarInferencePipeline(ScalarInferencePipelineBase):
         subject_ids = model_inputs_and_labels.subject_ids
         labels = self.model_config.get_gpu_tensor_if_possible(model_inputs_and_labels.labels)
 
-        model_output: torch.Tensor = self.model.forward(*model_inputs_and_labels.model_inputs)
+        model_output, _ = self.model.forward(*model_inputs_and_labels.model_inputs)
         if isinstance(model_output, list):
             # Model output is a list if we are using data parallel. Here, this will be a degenerate list with
             # only 1 element

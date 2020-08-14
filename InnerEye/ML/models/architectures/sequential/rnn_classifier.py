@@ -47,13 +47,34 @@ class RNNClassifier(DeviceAwareModule[List[ClassificationItemSequence], torch.Te
         self.input_dim = input_dim
         self.ref_indices = ref_indices
         self.hidden_dim = hidden_dim
+        self.embedding_dim = hidden_dim // 2
         # The GRU takes embeddings as inputs, and outputs hidden states
         # with dimensionality hidden_dim.
-        self.gru: LayerNormGRU = LayerNormGRU(input_size=input_dim,
-                                              hidden_size=hidden_dim,
-                                              num_layers=num_rnn_layers,
-                                              use_layer_norm=use_layer_norm,
-                                              dropout=rnn_dropout)
+        self.gru_encode_hidden: LayerNormGRU = LayerNormGRU(input_size=input_dim,
+                                                            hidden_size=hidden_dim,
+                                                            num_layers=num_rnn_layers,
+                                                            use_layer_norm=use_layer_norm,
+                                                            dropout=rnn_dropout)
+
+        self.gru_hidden_to_embed: LayerNormGRU = LayerNormGRU(input_size=hidden_dim,
+                                                              hidden_size=self.embedding_dim,
+                                                              num_layers=num_rnn_layers,
+                                                              use_layer_norm=use_layer_norm,
+                                                              dropout=rnn_dropout)
+
+        self.gru_decoder_hidden: LayerNormGRU = LayerNormGRU(input_size=self.embedding_dim,
+                                                             hidden_size=self.embedding_dim,
+                                                             num_layers=num_rnn_layers,
+                                                             use_layer_norm=use_layer_norm,
+                                                             dropout=rnn_dropout)
+
+        self.gru_decoder_embed_to_hidden = LayerNormGRU(input_size=self.embedding_dim,
+                                                        hidden_size=hidden_dim,
+                                                        num_layers=num_rnn_layers,
+                                                        use_layer_norm=use_layer_norm,
+                                                        dropout=rnn_dropout)
+
+        self.hidden_to_seq = nn.Linear(self.hidden_dim, input_dim)
 
         # The linear layer that maps from hidden state space to class space
         if self.ref_indices is None:
@@ -64,6 +85,10 @@ class RNNClassifier(DeviceAwareModule[List[ClassificationItemSequence], torch.Te
         # Create a parameter to learn the initial hidden state
         hidden_size = torch.Size([num_rnn_layers, 1, hidden_dim])
         self.h0 = nn.Parameter(torch.zeros(size=hidden_size), requires_grad=True)
+        embedding_size = torch.Size([num_rnn_layers, 1, self.embedding_dim])
+        self.e0 = nn.Parameter(torch.zeros(size=embedding_size), requires_grad=True)
+        self.e1 = nn.Parameter(torch.zeros(size=embedding_size), requires_grad=True)
+        self.h1 = nn.Parameter(torch.zeros(size=hidden_size), requires_grad=True)
         self.initialise_parameters()
 
     def forward(self, *input_seq: torch.Tensor) -> torch.Tensor:  # type: ignore
@@ -74,18 +99,22 @@ class RNNClassifier(DeviceAwareModule[List[ClassificationItemSequence], torch.Te
         batch_size, seq_length, _ = input_seq[0].size()
         # GRU forward pass and linear mapping from hidden state to the output space.
         # gru_out of shape [batch_size, seq_length, hidden_dim]
-        gru_out: torch.Tensor = self.gru(input_seq[0], self.h0.repeat(1, batch_size, 1))
+        gru_out: torch.Tensor = self.gru_encode_hidden(input_seq[0], self.h0.repeat(1, batch_size, 1))
+        gru_out_embed = self.gru_hidden_to_embed(gru_out, self.e0.repeat(1, batch_size, 1))
+        gru_decoder_hidden = self.gru_decoder_hidden(gru_out_embed, self.e1.repeat(1, batch_size, 1))
+        gru_decoder_embed_to_hidden = self.gru_decoder_embed_to_hidden(gru_decoder_hidden, self.h1.repeat(1, batch_size, 1))
+        seq = self.hidden_to_seq(gru_decoder_embed_to_hidden)
         # pad the gru output if required to ensure values for each target index
         gru_out = self.pad_gru_output(gru_out)
 
         if self.ref_indices is None:
-            return self.hidden2class(gru_out[:, self.target_indices, :])
+            return self.hidden2class(gru_out[:, self.target_indices, :]), seq
         else:
             predictions = []
             for target_index in self.target_indices:
                 input_to_classifier = gru_out[:, self.ref_indices + [target_index], :].view(batch_size, -1)
                 predictions.append(self.hidden2class(input_to_classifier))
-            return torch.stack(predictions, dim=1)
+            return torch.stack(predictions, dim=1), seq
 
     def pad_gru_output(self, input: torch.Tensor) -> torch.Tensor:
         """

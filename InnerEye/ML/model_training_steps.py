@@ -141,7 +141,7 @@ class ModelTrainingStepsBase(Generic[C, M], ABC):
         else:
             return loss_function
 
-    def compute_loss(self, model_output: torch.Tensor, labels: NumpyOrTorch) -> torch.Tensor:
+    def compute_loss(self, model_output: torch.Tensor, labels: NumpyOrTorch, seq, inputs) -> torch.Tensor:
         """
         Provided model outputs (logits) applies the criterion function and returns the loss tensor.
         If data parallel is used, then the independent loss values are aggregated by averaging.
@@ -150,21 +150,21 @@ class ModelTrainingStepsBase(Generic[C, M], ABC):
         """
         # ensure that the labels are loaded into the GPU
         labels = self.model_config.get_gpu_tensor_if_possible(labels)
-        loss = self.forward_criterion(model_output, labels)
+        loss = self.forward_criterion(model_output, labels, seq, inputs)
         if self.model_config.use_data_parallel:
             # Aggregate the loss values for each parallelized batch element.
             loss = torch.mean(loss)
         return loss
 
     def forward_criterion(self, model_output: Union[torch.Tensor, List[torch.Tensor]],
-                          labels: NumpyOrTorch) -> torch.Tensor:
+                          labels: NumpyOrTorch, seq, inputs) -> torch.Tensor:
         """
         Handles the forward pass for the loss function.
         :param model_output: A single Tensor, or a list if using DataParallelCriterion
         :param labels: Labels to compute loss against.
         :return: loss tensor.
         """
-        return self.criterion(model_output, labels)
+        return self.criterion(model_output, labels, seq, inputs)
 
 
 @dataclass
@@ -300,17 +300,19 @@ class ModelTrainingStepsForScalarModel(ModelTrainingStepsBase[F, DeviceAwareModu
         :return: Tuple (logits, model_output).
         """
         if use_mean_teacher_model:
-            logits = self.train_val_params.mean_teacher_model(*model_inputs)
+            logits, seq = self.train_val_params.mean_teacher_model(*model_inputs)
         else:
-            logits = self.train_val_params.model(*model_inputs)
+            logits, seq = self.train_val_params.model(*model_inputs)
         if isinstance(logits, list):
             # When using multiple GPUs, logits is a list of tensors. Gather will concatenate them
             # across the first dimension, and move them to GPU0.
             model_output = torch.nn.parallel.gather(logits, target_device=0)
+            model_seq = torch.nn.parallel.gather(seq, target_device=0)
         else:
             model_output = logits
+            model_seq = seq
         model_output = self.model_config.get_post_loss_logits_normalization_function()(model_output)
-        return logits, model_output
+        return logits, model_output, model_seq
 
     def forward_and_backward_minibatch(self, sample: Dict[str, Any], batch_index: int, epoch: int) -> float:
         """
@@ -326,15 +328,15 @@ class ModelTrainingStepsForScalarModel(ModelTrainingStepsBase[F, DeviceAwareModu
 
         if self.in_training_mode:
             model.train()
-            logits, model_output = self.get_logits_and_outputs(*model_inputs_and_labels.model_inputs)
+            logits, model_output, seq = self.get_logits_and_outputs(*model_inputs_and_labels.model_inputs)
         else:
             model.eval()
             with torch.no_grad():
-                logits, model_output = self.get_logits_and_outputs(*model_inputs_and_labels.model_inputs)
+                logits, model_output, seq = self.get_logits_and_outputs(*model_inputs_and_labels.model_inputs)
             model.train()
 
         label_gpu = self.get_label_tensor(model_inputs_and_labels.labels)
-        loss = self.compute_loss(logits, label_gpu)
+        loss = self.compute_loss(logits, label_gpu, seq, model_inputs_and_labels.model_inputs)
 
         if self.in_training_mode:
             single_optimizer_step(self.model_config, loss, self.train_val_params.optimizer)
@@ -349,11 +351,11 @@ class ModelTrainingStepsForScalarModel(ModelTrainingStepsBase[F, DeviceAwareModu
                 _, model_output = self.get_logits_and_outputs(*model_inputs_and_labels.model_inputs,
                                                               use_mean_teacher_model=True)
 
-        if self._should_save_grad_cam_output(epoch=epoch, batch_index=batch_index):
-            self.save_grad_cam(epoch, model_inputs_and_labels.subject_ids,
-                               model_inputs_and_labels.data_item,
-                               model_inputs_and_labels.model_inputs,
-                               label_gpu)
+        # if self._should_save_grad_cam_output(epoch=epoch, batch_index=batch_index):
+        #     self.save_grad_cam(epoch, model_inputs_and_labels.subject_ids,
+        #                        model_inputs_and_labels.data_item,
+        #                        model_inputs_and_labels.model_inputs,
+        #                        label_gpu)
 
         self.metrics.add_metric(MetricType.LOSS, loss.item())
         self.update_metrics(model_inputs_and_labels.subject_ids, model_output, label_gpu)
@@ -456,7 +458,7 @@ class ModelTrainingStepsForSequenceModel(ModelTrainingStepsForScalarModel[Sequen
     """
 
     def forward_criterion(self, model_output: Union[torch.Tensor, List[torch.Tensor]],
-                          labels: NumpyOrTorch) -> torch.Tensor:
+                          labels: NumpyOrTorch, seq, inputs) -> torch.Tensor:
         _model_output: torch.Tensor
         # we need to gather the model outputs before masking them for the criterion.
         if isinstance(model_output, list):
@@ -465,6 +467,13 @@ class ModelTrainingStepsForSequenceModel(ModelTrainingStepsForScalarModel[Sequen
             _model_output = torch.nn.parallel.gather(model_output, target_device=0)
         else:
             _model_output = model_output
+
+        if isinstance(seq, list):
+            # When using multiple GPUs, model_output is a list of tensors. Gather will concatenate them
+            # across the first dimension, and move them to GPU0.
+            _seq = torch.nn.parallel.gather(seq, target_device=0)
+        else:
+            _seq = seq
 
         # create masked sequences based on the labels
         masked_model_outputs_and_labels = get_masked_model_outputs_and_labels(_model_output, labels)
@@ -477,7 +486,10 @@ class ModelTrainingStepsForSequenceModel(ModelTrainingStepsForScalarModel[Sequen
         else:
             criterion = self.criterion
 
-        return criterion(masked_model_outputs_and_labels.model_outputs, masked_model_outputs_and_labels.labels)
+        class_loss = criterion(masked_model_outputs_and_labels.model_outputs, masked_model_outputs_and_labels.labels)
+        seq_loss = torch.nn.functional.mse_loss(_seq, inputs[0].cuda())
+        weight = 0.5
+        return (weight * class_loss) + ((1 - weight) * seq_loss)
 
 
 class ModelTrainingStepsForSegmentation(ModelTrainingStepsBase[SegmentationModelBase, DeviceAwareModule]):
