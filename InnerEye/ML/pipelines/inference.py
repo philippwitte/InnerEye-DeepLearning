@@ -410,7 +410,7 @@ class InferenceBatch(CTImagesMaskedBatch):
         # create posterior output for each class with the shape: Class x Z x Y x x. We use float32 as these
         # arrays can be big.
         output_image_shape = self.pipeline.get_variable(InferencePipeline.Variables.OutputImageShape)
-        posteriors = np.zeros(shape=[model_config.number_of_classes] + list(output_image_shape), dtype=np.float32)
+        posteriors = np.zeros(shape=[model_config.number_of_classes] + list(output_image_shape), dtype=np.float16)
         stride = self.pipeline.get_variable(InferencePipeline.Variables.Stride)
 
         for c in range(len(posteriors)):
