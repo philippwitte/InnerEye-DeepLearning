@@ -28,6 +28,7 @@ from InnerEye.ML.sequence_config import SEQUENCE_POSITION_HUE_NAME_PREFIX, Seque
 from InnerEye.ML.utils import ml_util
 from InnerEye.ML.utils.augmentation import RandAugmentSlice, ScalarItemAugmentation
 from InnerEye.ML.utils.dataset_util import CategoricalToOneHotEncoder
+from InnerEye.ML.utils.image_util import NumpyOrTorch
 from InnerEye.ML.utils.io_util import ImageAndSegmentations
 from InnerEye.ML.utils.metrics_constants import LoggingColumns
 from InnerEye.ML.utils.model_util import ModelAndInfo, create_model_with_temperature_scaling, \
@@ -396,7 +397,7 @@ class ToyMultiLabelSequenceModel(SequenceModelBase):
             numerical_columns=["NUM1", "NUM2"],
             sequence_column="Position",
             sequence_target_positions=[1, 2, 3],
-            loss_type=ScalarLoss.WeightedCrossEntropyWithLogits,
+            loss_type=ScalarLoss.BinaryCrossEntropyWithLogits,
             num_epochs=num_epochs,
             num_dataload_workers=0,
             test_start_epoch=num_epochs,
@@ -404,6 +405,7 @@ class ToyMultiLabelSequenceModel(SequenceModelBase):
             l_rate=1e-1,
             label_smoothing_eps=0.05,
             categorical_columns=["CAT1"],
+            use_temporal_label_smoothing = True,
             **kwargs
         )
 
@@ -422,6 +424,12 @@ class ToyMultiLabelSequenceModel(SequenceModelBase):
                              num_rnn_layers=2,
                              rnn_dropout=0.0,
                              target_indices=self.get_target_indices())
+
+    def custom_temporal_label_smoothing_fn(self, labels: NumpyOrTorch):
+        """ Dummy transformation """
+        result = labels.clone()
+        result[~torch.isnan(result)] = 0.5
+        return result
 
 
 @pytest.mark.skipif(common_util.is_windows(), reason="Has issues on windows build")

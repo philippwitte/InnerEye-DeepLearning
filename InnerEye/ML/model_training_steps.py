@@ -462,8 +462,14 @@ class ModelTrainingStepsForSequenceModel(ModelTrainingStepsForScalarModel[Sequen
     This class implements all steps necessary for training an sequence model during a single epoch.
     """
 
+    def __init__(self, config: F, train_val_params: TrainValidateParameters[DeviceAwareModule]):
+        super().__init__(config, train_val_params)
+        if config.use_temporal_label_smoothing:
+            self.custom_temporal_label_smoothing_fn = config.custom_temporal_label_smoothing_fn
+
     def forward_criterion(self, model_output: Union[torch.Tensor, List[torch.Tensor]],
                           labels: NumpyOrTorch) -> torch.Tensor:
+
         _model_output: torch.Tensor
         # we need to gather the model outputs before masking them for the criterion.
         if isinstance(model_output, list):
@@ -473,6 +479,7 @@ class ModelTrainingStepsForSequenceModel(ModelTrainingStepsForScalarModel[Sequen
         else:
             _model_output = model_output
 
+        labels = self.custom_temporal_label_smoothing_fn(labels)
         # create masked sequences based on the labels
         masked_model_outputs_and_labels = get_masked_model_outputs_and_labels(_model_output, labels)
         if masked_model_outputs_and_labels is None:

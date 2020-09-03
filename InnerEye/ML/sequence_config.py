@@ -10,6 +10,7 @@ import param
 from InnerEye.ML.common import ModelExecutionMode
 from InnerEye.ML.deep_learning_config import TemperatureScalingConfig
 from InnerEye.ML.scalar_config import ScalarModelBase
+from InnerEye.ML.utils.image_util import NumpyOrTorch
 from InnerEye.ML.utils.split_dataset import DatasetSplits
 
 SEQUENCE_POSITION_HUE_NAME_PREFIX = "Seq_pos"
@@ -48,6 +49,9 @@ class SequenceModelBase(ScalarModelBase):
         doc="If a config is provided then it will be used to learn a temperature scaling parameter using the "
             "validation set to calibrate the model logits see: https://arxiv.org/abs/1706.04599 for each "
             "epoch that requires a checkpoint to be saved. Turned off by default.")
+
+    use_temporal_label_smoothing: bool = param.Boolean(default=False, doc="If True apply a custom temporal label "
+                                                                          "smoothing function before computing the loss")
 
     def __init__(self, **params: Any):
         super().__init__(**params)
@@ -103,3 +107,6 @@ class SequenceModelBase(ScalarModelBase):
             ModelExecutionMode.VAL: val,
             ModelExecutionMode.TEST: test
         }
+
+    def custom_temporal_label_smoothing_fn(self, labels: NumpyOrTorch):
+        raise NotImplementedError("Please implement your own temporal label smoothing function in your config.")
