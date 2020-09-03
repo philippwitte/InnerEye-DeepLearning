@@ -1,0 +1,33 @@
+run_name: "cpc_stl10_baseline"
+random_seed: 1
+log_level: INFO
+data_folder: ./data
+download_data: True
+input_channels: 1
+num_workers: 6
+train_data_fraction: 1.0
+input_image_size: [64, 64]
+patch_sizes: [16, 16]
+patch_strides: [8, 8]
+encoder_init_dim: 64
+encoder_out_dim: 512
+encoder_res_block_depth: 3
+encoder_use_norm: False
+learning_rate: 0.0002
+batch_size: 128
+num_epochs: 300
+resume_from: False
+amp_training: False
+negative_samples: 16
+no_patch_augmentation: True
+use_memory_bank: False
+k_prediction_steps: [5]
+num_skip_steps: [1]
+directions: ['down']
+score_model_depth: 1
+no_unit_sphere_norm: True
+use_aggregator: True
+aggregator_hidden_dim: 64
+aggregator_depth: 3
+aggregator_kernel_size: [3]
+aggregator_use_norm: False
