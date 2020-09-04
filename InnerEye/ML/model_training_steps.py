@@ -478,8 +478,9 @@ class ModelTrainingStepsForSequenceModel(ModelTrainingStepsForScalarModel[Sequen
             _model_output = torch.nn.parallel.gather(model_output, target_device=0)
         else:
             _model_output = model_output
+        if self.model_config.use_temporal_label_smoothing:
+            labels = self.custom_temporal_label_smoothing_fn(labels)
 
-        labels = self.custom_temporal_label_smoothing_fn(labels)
         # create masked sequences based on the labels
         masked_model_outputs_and_labels = get_masked_model_outputs_and_labels(_model_output, labels)
         if masked_model_outputs_and_labels is None:
