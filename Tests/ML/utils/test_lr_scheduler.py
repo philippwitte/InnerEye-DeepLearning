@@ -12,7 +12,7 @@ from torch.optim.lr_scheduler import ExponentialLR, StepLR, MultiStepLR, LambdaL
 
 from InnerEye.ML.config import SegmentationModelBase
 from InnerEye.ML.deep_learning_config import LRSchedulerType, LRWarmUpType
-from InnerEye.ML.utils.lr_scheduler import LRScheduler
+from InnerEye.ML.utils.lr_scheduler import LRScheduler, SchedulerWithWarmUp
 from Tests.ML.configs.DummyModel import DummyModel
 
 
@@ -195,42 +195,52 @@ def test_resume_from_saved_state(lr_scheduler_type: LRSchedulerType,
 
 
 @pytest.mark.parametrize("lr_scheduler_type", [x for x in LRSchedulerType])
-def test_save_and_load_state_dict(lr_scheduler_type: LRSchedulerType) -> None:
+@pytest.mark.parametrize("warmup_epochs", [0, 4])
+def test_save_and_load_state_dict(lr_scheduler_type: LRSchedulerType, warmup_epochs: int) -> None:
 
     def object_dict_same(lr1: LRScheduler, lr2: LRScheduler) -> bool:
         """
-        Tests to see if two LRScheduler objects are the same.
+        Tests to see if the LRScheduler object lr1 matches the expected object lr2.
         This ignores lambdas if one of the schedulers is LambdaLR, since lambdas are not stored to the state dict.
         """
+
         # dict of object LR scheduler
         # ignore the _scheduler attribute, which is of type SchedulerWithWarmUp and compare it separately
         dict1 = {key: val for key, val in lr1.__dict__.items() if key != "_scheduler"}
         dict2 = {key: val for key, val in lr2.__dict__.items() if key != "_scheduler"}
 
         # see if the SchedulerWithWarmUp object is the same
-        warmup_and_scheduler1 = lr1.__dict__["_scheduler"]
-        warmup_and_scheduler2 = lr2.__dict__["_scheduler"]
+        main_scheduler1 = lr1.__dict__["_scheduler"]
+        main_scheduler2 = lr2.__dict__["_scheduler"]
 
-        # scheduler object
-        scheduler1 = warmup_and_scheduler1.__dict__["_scheduler"]
-        scheduler2 = warmup_and_scheduler2.__dict__["_scheduler"]
-        # remove lambdas from scheduler dict
-        scheduler1_dict = {key: val for key, val in scheduler1.__dict__.items() if key != "lr_lambdas"}
-        scheduler2_dict = {key: val for key, val in scheduler2.__dict__.items() if key != "lr_lambdas"}
+        if isinstance(lr2._scheduler, SchedulerWithWarmUp):
+            # scheduler object
+            scheduler1 = main_scheduler1.__dict__["_scheduler"]
+            scheduler2 = main_scheduler2.__dict__["_scheduler"]
+            # remove lambdas from scheduler dict
+            scheduler1_dict = {key: val for key, val in scheduler1.__dict__.items() if key != "lr_lambdas"}
+            scheduler2_dict = {key: val for key, val in scheduler2.__dict__.items() if key != "lr_lambdas"}
 
-        # warmup object
-        warmup1 = warmup_and_scheduler1.__dict__["_warmup_scheduler"]
-        warmup2 = warmup_and_scheduler2.__dict__["_warmup_scheduler"]
+            # warmup object
+            warmup1 = main_scheduler1.__dict__["_warmup_scheduler"]
+            warmup2 = main_scheduler2.__dict__["_warmup_scheduler"]
 
-        # Other variables in the object SchedulerWithWarmUp
-        other_variables1 = {key: val for key, val in warmup_and_scheduler1.__dict__.items()
-                            if key != "_scheduler" and key != "_warmup_scheduler"}
-        other_variables2 = {key: val for key, val in warmup_and_scheduler2.__dict__.items()
-                            if key != "_scheduler" and key != "_warmup_scheduler"}
+            # Other variables in the object SchedulerWithWarmUp
+            other_variables1 = {key: val for key, val in main_scheduler1.__dict__.items()
+                                if key != "_scheduler" and key != "_warmup_scheduler"}
+            other_variables2 = {key: val for key, val in main_scheduler2.__dict__.items()
+                                if key != "_scheduler" and key != "_warmup_scheduler"}
 
-        return dict1 == dict2 and other_variables1 == other_variables2 and \
-                                  scheduler1_dict == scheduler2_dict and \
-                                  warmup1.__dict__ == warmup2.__dict__
+            return dict1 == dict2 and other_variables1 == other_variables2 and \
+                                      scheduler1_dict == scheduler2_dict and \
+                                      warmup1.__dict__ == warmup2.__dict__
+
+        else:
+            # lr2._scheduler is a standard Pytorch scheduler.
+            scheduler1_dict = {key: val for key, val in main_scheduler1.__dict__.items() if key != "lr_lambdas"}
+            scheduler2_dict = {key: val for key, val in main_scheduler2.__dict__.items() if key != "lr_lambdas"}
+
+            return dict1 == dict2 and scheduler1_dict == scheduler2_dict
 
     config = DummyModel(num_epochs=10,
                         l_rate_scheduler=lr_scheduler_type,
@@ -241,13 +251,15 @@ def test_save_and_load_state_dict(lr_scheduler_type: LRSchedulerType) -> None:
                         l_rate_multi_step_milestones=[3, 5, 7],
                         l_rate_polynomial_gamma=0.9,
                         l_rate_warmup=LRWarmUpType.Linear,
-                        l_rate_warmup_epochs=4)
+                        l_rate_warmup_epochs=warmup_epochs)
     lr_scheduler_1, optimizer = _create_lr_scheduler_and_optimizer(config)
 
     lr_scheduler_1.step()
-    # This is not supported functionality - we are doing this just to change _scheduler from its default state
-    lr_scheduler_1._scheduler.step()
-    lr_scheduler_1._scheduler.step()
+
+    if isinstance(lr_scheduler_1._scheduler, SchedulerWithWarmUp):
+        # This is not supported functionality - we are doing this just to change _scheduler from its default state
+        lr_scheduler_1._scheduler._scheduler.step()  # type: ignore
+        lr_scheduler_1._scheduler._scheduler.step()  # type: ignore
 
     state_dict = lr_scheduler_1.state_dict()
 
