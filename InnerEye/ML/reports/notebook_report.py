@@ -12,6 +12,7 @@ from nbconvert import HTMLExporter
 from nbconvert.writers import FilesWriter
 
 from InnerEye.Common import fixed_paths
+from InnerEye.Common.common_util import FULL_METRICS_DATAFRAME_FILE, METRICS_AGGREGATES_FILE
 
 
 def print_header(message: str, level: int = 2) -> None:
@@ -66,6 +67,24 @@ def generate_segmentation_notebook(result_notebook: Path,
             'test_metrics_csv': str_or_empty(test_metrics),
         }
     template = Path(__file__).absolute().parent / "segmentation_report.ipynb"
+    return generate_notebook(template,
+                             notebook_params=notebook_params,
+                             result_notebook=result_notebook)
+
+
+def generate_classification_notebook(result_notebook: Path, data_folder: Optional[Path] = None):
+    def str_or_empty(p: Optional[Path]) -> str:
+        return str(p) if p else ""
+
+    metrics_aggregates_file = data_folder / METRICS_AGGREGATES_FILE
+    metrics_across_all_runs_file = data_folder / FULL_METRICS_DATAFRAME_FILE
+    notebook_params = \
+        {
+            'metrics_aggregates_file': str(metrics_aggregates_file),
+            'metrics_across_all_runs_file': str(metrics_across_all_runs_file)
+        }
+
+    template = Path(__file__).absolute().parent / "classification_report.ipynb"
     return generate_notebook(template,
                              notebook_params=notebook_params,
                              result_notebook=result_notebook)

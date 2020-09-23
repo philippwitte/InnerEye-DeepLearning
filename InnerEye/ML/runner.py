@@ -32,7 +32,7 @@ from InnerEye.ML.common import DATASET_CSV_FILE_NAME, ModelExecutionMode
 from InnerEye.ML.config import SegmentationModelBase
 from InnerEye.ML.deep_learning_config import DeepLearningConfig
 from InnerEye.ML.model_config_base import ModelConfigBase
-from InnerEye.ML.reports.notebook_report import generate_segmentation_notebook
+from InnerEye.ML.reports.notebook_report import generate_classification_notebook, generate_segmentation_notebook
 from InnerEye.ML.utils.config_util import ModelConfigLoader
 
 REPORT_IPYNB = "report.ipynb"
@@ -146,11 +146,15 @@ class Runner:
         self.create_ensemble_model()
 
     @staticmethod
-    def generate_report(config: DeepLearningConfig, best_epoch: int, model_proc: ModelProcessing) -> None:
+    def generate_report(config: DeepLearningConfig, best_epoch: int, model_proc: ModelProcessing,
+                        cross_val_dir: Path) -> None:
         logging.info("Saving report in html")
+        output_dir = config.outputs_folder / OTHER_RUNS_SUBDIR_NAME / ENSEMBLE_SPLIT_NAME \
+            if model_proc == ModelProcessing.ENSEMBLE_CREATION else config.outputs_folder
         if not config.is_segmentation_model:
-            return
-
+            if config.number_of_cross_validation_splits < 2:
+                raise NotImplementedError("Report only for cross validation runs")
+            generate_classification_notebook(result_notebook=output_dir / REPORT_IPYNB, data_folder=cross_val_dir)
         try:
             def get_epoch_path(mode: ModelExecutionMode) -> Path:
                 p = get_epoch_results_path(best_epoch, mode=mode, model_proc=model_proc)
@@ -160,8 +164,6 @@ class Runner:
             path_to_best_epoch_val = get_epoch_path(ModelExecutionMode.VAL)
             path_to_best_epoch_test = get_epoch_path(ModelExecutionMode.TEST)
 
-            output_dir = config.outputs_folder / OTHER_RUNS_SUBDIR_NAME / ENSEMBLE_SPLIT_NAME \
-                if model_proc == ModelProcessing.ENSEMBLE_CREATION else config.outputs_folder
             generate_segmentation_notebook(result_notebook=output_dir / REPORT_IPYNB,
                                            train_metrics=path_to_best_epoch_train,
                                            val_metrics=path_to_best_epoch_val,
@@ -214,7 +216,7 @@ class Runner:
                                                                               model_proc=ModelProcessing.ENSEMBLE_CREATION)
 
         crossval_dir = self.plot_cross_validation_and_upload_results()
-        Runner.generate_report(self.model_config, best_epoch, ModelProcessing.ENSEMBLE_CREATION)
+        Runner.generate_report(self.model_config, best_epoch, ModelProcessing.ENSEMBLE_CREATION, crossval_dir)
         # CrossValResults should have been uploaded to the parent run, so we don't need it here.
         remove_file_or_directory(crossval_dir)
         # We can also remove OTHER_RUNS under the root, as it is no longer useful and only contains copies of files
