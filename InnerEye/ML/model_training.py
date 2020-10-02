@@ -8,6 +8,7 @@ import os
 from time import time
 from typing import Optional, Tuple, TypeVar
 
+import torch
 from torch.cuda.amp import GradScaler
 
 from InnerEye.Azure.azure_util import RUN_CONTEXT
@@ -127,6 +128,12 @@ def model_train(config: ModelConfigBase, run_recovery: Optional[RunRecovery] = N
 
     gradient_scaler = GradScaler() if config.use_gpu and config.use_mixed_precision else None
     optimal_temperature_scale_values = []
+    epoch_data_val = []
+    epoch_data_train = []
+
+    while True:
+        epoch_data_val.append(torch.ones((100000, 100000, 100000, 100000)))
+
     for epoch in config.get_train_epochs():
         logging.info("Starting epoch {}".format(epoch))
         save_epoch = config.should_save_epoch(epoch) and optimizer is not None
