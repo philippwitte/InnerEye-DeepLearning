@@ -131,9 +131,6 @@ def model_train(config: ModelConfigBase, run_recovery: Optional[RunRecovery] = N
     epoch_data_val = []
     epoch_data_train = []
 
-    while True:
-        epoch_data_val.append(torch.ones((100000, 100000, 100000, 100000)))
-
     for epoch in config.get_train_epochs():
         logging.info("Starting epoch {}".format(epoch))
         save_epoch = config.should_save_epoch(epoch) and optimizer is not None
