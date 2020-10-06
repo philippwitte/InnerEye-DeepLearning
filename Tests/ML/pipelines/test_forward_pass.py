@@ -3,7 +3,7 @@
 #  Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 #  ------------------------------------------------------------------------------------------
 from pathlib import Path
-from typing import Any, List, Optional, Union, Tuple
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pytest
