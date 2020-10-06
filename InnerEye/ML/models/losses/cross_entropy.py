@@ -89,8 +89,7 @@ class CrossEntropyLoss(SupervisedLearningCriterion):
         # Normalise the weights to preserve the loss range and lr sensitivity
         num_pixels = pixel_weights.nelement() / float(pixel_weights.size(1))
         # noinspection PyTypeChecker
-        scaling = num_pixels / \
-                  (torch.sum(torch.masked_select(pixel_weights, target.eq(1.0))) + self.eps)  # type: ignore
+        scaling = num_pixels / (torch.sum(torch.mul(pixel_weights, target)) + self.eps)  # type: ignore
 
         return pixel_weights * scaling
 
